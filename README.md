@@ -1,4 +1,4 @@
-# Arduino Embedded Systems Projects
+# Arduino Embedded Systems and Automation
 
 ## Overview
 
