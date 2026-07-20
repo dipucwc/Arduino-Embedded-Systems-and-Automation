@@ -1,4 +1,4 @@
-## Embedded Control and Hardware Interfaces
+# Embedded Control and Hardware Interfaces
 
 This folder contains Arduino-based embedded-system projects focused on hardware control, timing, interrupt handling, pulse-width modulation, actuator control, and display interfacing.
 
