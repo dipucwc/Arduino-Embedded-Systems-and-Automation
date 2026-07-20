@@ -1,0 +1,429 @@
+# Interrupt-Driven Event Controller
+
+## Overview
+
+This project implements an interrupt-driven push-button controller using an Arduino Uno. A hardware interrupt on digital pin 2 detects button presses, and each accepted event toggles an LED connected to digital pin 8.
+
+The interrupt service routine is intentionally short. It only records that an interrupt occurred and returns immediately. Debouncing, LED control, event counting, status reporting, and Serial Monitor command processing are performed in the main program.
+
+This design demonstrates practical interrupt handling, safe data sharing between an ISR and the main loop, software debouncing, and event-driven embedded control.
+
+## Project Status
+
+**Completed**
+
+## Main Features
+
+- External interrupt on Arduino Uno pin 2
+- Push-button input using `INPUT_PULLUP`
+- Falling-edge interrupt detection
+- Minimal interrupt service routine
+- Software button debouncing
+- LED toggle after each accepted press
+- Accepted-event counter
+- Raw interrupt counter
+- Rejected-bounce counter
+- Interrupt enable and disable commands
+- Adjustable debounce interval
+- Manual LED commands
+- Atomic access to shared multi-byte data
+- Fixed-size serial command buffer
+- Input validation
+- Status and help commands
+
+## Folder Structure
+
+```text
+03_interrupt_driven_event_handling/
+├── Interrupt_Service_Routine.ino
+├── README.md
+├── COMMANDS.txt
+├── circuit/
+│   └── interrupt_event_controller_wiring.png
+└── demo/
+    └── interrupt_event_controller_wiring_and_setup.mp4
+```
+
+## Hardware Requirements
+
+- Arduino Uno or compatible board
+- Momentary push button
+- LED
+- 220 Ω or 330 Ω resistor
+- Breadboard
+- Jumper wires
+
+## Pin Assignment
+
+| Function | Arduino Uno pin |
+|---|---:|
+| Push-button interrupt input | Digital pin 2 |
+| LED output | Digital pin 8 |
+| Ground reference | GND |
+
+Digital pin 2 provides external interrupt `INT0` on the Arduino Uno.
+
+## Circuit Connection
+
+### Push Button
+
+```text
+Arduino pin 2 ── push button ── Arduino GND
+```
+
+No external pull-up resistor is required because the program uses:
+
+```cpp
+pinMode(BUTTON_PIN, INPUT_PULLUP);
+```
+
+With `INPUT_PULLUP`, the unpressed input is HIGH. Pressing the button connects pin 2 to GND, producing a falling edge.
+
+### LED
+
+```text
+Arduino pin 8 ── 220 Ω or 330 Ω resistor ── LED anode (+)
+Arduino GND   ───────────────────────────── LED cathode (-)
+```
+
+## Complete Wiring Summary
+
+| Component terminal | Connection |
+|---|---|
+| Button side 1 | Arduino digital pin 2 |
+| Button opposite side | Arduino GND |
+| Resistor input | Arduino digital pin 8 |
+| Resistor output | LED anode, long leg |
+| LED cathode, short leg | Arduino GND |
+
+For a four-leg tactile button, the two pins on the same side are normally connected internally. Use one pin from each opposite side.
+
+## Interrupt Configuration
+
+```cpp
+attachInterrupt(
+    digitalPinToInterrupt(BUTTON_PIN),
+    buttonInterruptServiceRoutine,
+    FALLING
+);
+```
+
+`FALLING` triggers the interrupt when the input changes from HIGH to LOW.
+
+## Interrupt Service Routine
+
+```cpp
+void buttonInterruptServiceRoutine()
+{
+  ++rawInterruptCount;
+  interruptPending = true;
+}
+```
+
+The ISR does not use `Serial`, `delay()`, long calculations, or LED control.
+
+## Volatile Variables
+
+```cpp
+volatile bool interruptPending = false;
+volatile uint32_t rawInterruptCount = 0;
+```
+
+These variables can change inside the ISR. `volatile` prevents the compiler from assuming that their values remain unchanged.
+
+## Atomic Access
+
+Arduino Uno uses an 8-bit AVR microcontroller. Reading a 32-bit counter requires several processor operations.
+
+```cpp
+noInterrupts();
+countSnapshot = rawInterruptCount;
+interrupts();
+```
+
+This prevents the ISR from modifying the counter while it is being read.
+
+## Software Debouncing
+
+Mechanical buttons can generate several rapid transitions during one physical press.
+
+```cpp
+if ((currentTimeMs - lastAcceptedEventTimeMs) < debounceIntervalMs)
+{
+  ++rejectedBounceCount;
+  return;
+}
+```
+
+Default debounce interval:
+
+```text
+50 ms
+```
+
+Allowed range:
+
+```text
+5 ms to 1000 ms
+```
+
+## Event Processing Sequence
+
+1. The button changes pin 2 from HIGH to LOW.
+2. The hardware interrupt runs the ISR.
+3. The ISR increments the raw interrupt count.
+4. The ISR sets the pending-event flag.
+5. The main loop copies and clears the flag atomically.
+6. The main program applies the debounce rule.
+7. An accepted event increments the accepted-event counter.
+8. The LED state toggles.
+9. The event result is printed.
+
+## Serial Monitor Configuration
+
+```text
+Baud rate: 115200
+Line ending: Newline or Both NL & CR
+```
+
+## Commands
+
+| Command | Function |
+|---|---|
+| `status` | Print the current controller state |
+| `enable` | Enable the button interrupt |
+| `disable` | Disable the button interrupt |
+| `reset` | Reset counters and switch the LED off |
+| `led on` | Switch the LED on |
+| `led off` | Switch the LED off |
+| `led toggle` | Toggle the LED state |
+| `debounce 50` | Set the debounce interval to 50 ms |
+| `help` | Print the command list |
+
+## Command Examples
+
+### Status
+
+```text
+status
+```
+
+Example:
+
+```text
+Interrupt-driven event controller status
+  Interrupt: ENABLED
+  Button pin: 2
+  LED pin: 8
+  LED state: OFF
+  Accepted events: 0
+  Raw ISR count: 0
+  Rejected bounce events: 0
+  Debounce interval: 50 ms
+```
+
+### Disable and Enable
+
+```text
+disable
+enable
+```
+
+When disabled, button presses do not trigger the ISR.
+
+### Reset
+
+```text
+reset
+```
+
+This clears all counters and switches the LED off.
+
+### LED Control
+
+```text
+led on
+led off
+led toggle
+```
+
+### Debounce Setting
+
+```text
+debounce 100
+```
+
+Values below 5 ms are limited to 5 ms. Values above 1000 ms are limited to 1000 ms.
+
+## How to Run in Arduino IDE
+
+1. Create a folder named `Interrupt_Service_Routine`.
+2. Place `Interrupt_Service_Routine.ino` inside it.
+3. Open the file in Arduino IDE.
+4. Select Arduino Uno.
+5. Select the connected port.
+6. Click **Verify**.
+7. Click **Upload**.
+8. Open Serial Monitor at `115200` baud.
+9. Press the button and test the commands.
+
+## How to Run in Wokwi
+
+1. Create an Arduino Uno project.
+2. Add a push button.
+3. Add an LED.
+4. Add a 220 Ω or 330 Ω resistor.
+5. Connect the button between pin 2 and GND.
+6. Connect pin 8 to the resistor.
+7. Connect the resistor to the LED anode.
+8. Connect the LED cathode to GND.
+9. Paste `Interrupt_Service_Routine.ino` into `sketch.ino`.
+10. Start the simulation.
+11. Open Serial Monitor.
+12. Press the button and test the commands.
+
+## Recommended Test Procedure
+
+### Startup
+
+Confirm:
+
+- Interrupt is enabled.
+- LED is off.
+- Event counters are zero.
+- Debounce interval is 50 ms.
+
+### Single Button Press
+
+Press once and confirm:
+
+- LED toggles.
+- Accepted-event count increases.
+- Raw ISR count increases.
+
+### Repeated Presses
+
+Press several times with clear pauses and confirm that each accepted press toggles the LED.
+
+### Interrupt Disable
+
+Enter:
+
+```text
+disable
+```
+
+Press the button and confirm that nothing changes.
+
+Then enter:
+
+```text
+enable
+```
+
+### LED Commands
+
+```text
+led on
+led off
+led toggle
+```
+
+### Debounce Limits
+
+```text
+debounce 1
+debounce 2000
+```
+
+The code limits these values to 5 ms and 1000 ms.
+
+### Invalid Input
+
+```text
+debounce abc
+led invalid
+unknown
+```
+
+The controller should reject each invalid command and continue running.
+
+### Reset
+
+Generate several events, then enter:
+
+```text
+reset
+status
+```
+
+All counters should return to zero.
+
+## Suggested Demo Sequence
+
+```text
+status
+led on
+led off
+led toggle
+debounce 100
+disable
+enable
+reset
+status
+help
+```
+
+Press the button between commands to show interrupt-driven LED toggling.
+
+## Expected Results
+
+The project demonstrates:
+
+- Fast interrupt detection
+- Minimal ISR execution
+- Safe ISR-to-main event transfer
+- Reliable software debouncing
+- Accurate event counters
+- Correct LED toggling
+- Responsive serial commands
+- Atomic access to shared data
+- Correct interrupt enable and disable behavior
+
+## Safety Notes
+
+- Use a current-limiting resistor with the LED.
+- Confirm the push-button pin arrangement before wiring.
+- Avoid `Serial.print()`, `delay()`, and long processing inside an ISR.
+- Use atomic access for multi-byte data shared with an ISR.
+- Disconnect physical power before changing wiring.
+
+## Possible Extensions
+
+- Long-press and short-press detection
+- Double-click detection
+- A second interrupt input
+- Event queue implementation
+- Timer-based debounce
+- Sleep mode and interrupt wake-up
+- EEPROM counter storage
+- Oscilloscope verification of button bounce
+
+## Technical Skills Demonstrated
+
+- Arduino C++
+- External hardware interrupts
+- ISR design
+- Event-driven architecture
+- `volatile` variables
+- Atomic data access
+- Software debouncing
+- GPIO control
+- Serial communication
+- Command parsing
+- Input validation
+- Fixed-size buffers
+
+## License
+
+This project may be used for learning, testing, and portfolio demonstration.
