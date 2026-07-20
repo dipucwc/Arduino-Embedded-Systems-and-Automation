@@ -1,0 +1,561 @@
+# Non-Blocking Digital Output Controller
+
+## Overview
+
+This project implements a serial-command-controlled digital output using an Arduino Uno. An LED connected to digital pin 8 can operate in automatic blinking mode or direct manual mode.
+
+The program also supports output toggling, configurable blink timing, and non-blocking pulse generation. All timing is handled with `millis()` rather than `delay()`, allowing the controller to continue receiving Serial Monitor commands while the LED is blinking or while a timed pulse is active.
+
+## Project Status
+
+**Completed**
+
+The controller has been structured as an independent Arduino project and is ready for simulation, hardware testing, and GitHub documentation.
+
+## Main Features
+
+- Automatic LED blinking
+- Manual output control
+- Direct `ON` and `OFF` commands
+- Output toggle command
+- Configurable blink interval
+- Timed HIGH pulse generation
+- Non-blocking timing with `millis()`
+- Serial command parsing
+- Numeric input validation
+- Fixed-size command buffer
+- Oversized-command rejection
+- Current controller status reporting
+- Modular Arduino C++ functions
+
+## Folder Structure
+
+```text
+02_digital_output_control/
+├── Digital_Writing_Code.ino
+├── README.md
+├── circuit/
+│   └── digital_output_wiring.png
+├── results/
+│   └── digital_output_simulation.png
+└── demo/
+    └── digital_output_controller_demo.mp4
+```
+
+The `circuit`, `results`, and `demo` folders can be added after the simulation screenshots and video are prepared.
+
+## Hardware Requirements
+
+- Arduino Uno or compatible board
+- One LED
+- One 220 Ω or 330 Ω resistor
+- Breadboard
+- Jumper wires
+- USB cable for physical testing
+
+## Circuit Connection
+
+| Component connection | Arduino Uno |
+|---|---|
+| LED anode through 220 Ω or 330 Ω resistor | Digital pin 8 |
+| LED cathode | GND |
+
+### Connection Diagram
+
+```text
+Arduino pin 8 ── resistor ── LED anode
+Arduino GND   ────────────── LED cathode
+```
+
+The current-limiting resistor must be connected in series with the LED. Connecting an LED directly between an Arduino output pin and ground can allow excessive current to flow through the LED and the microcontroller pin.
+
+## Output Logic
+
+The output uses standard Arduino digital logic:
+
+| Arduino command | Pin state | LED condition |
+|---|---|---|
+| `digitalWrite(OUTPUT_PIN, HIGH)` | Approximately 5 V | ON |
+| `digitalWrite(OUTPUT_PIN, LOW)` | Approximately 0 V | OFF |
+
+The stored Boolean output state is converted into the required Arduino logic level:
+
+```cpp
+digitalWrite(OUTPUT_PIN, outputState ? HIGH : LOW);
+```
+
+## Operating Modes
+
+### Automatic Mode
+
+Automatic mode toggles the output after each configured interval. With the default interval of 500 ms, the LED remains ON for approximately 500 ms and OFF for approximately 500 ms.
+
+The complete ON/OFF cycle is therefore approximately 1000 ms.
+
+The automatic update uses unsigned time subtraction:
+
+```cpp
+if ((currentTimeMs - previousBlinkTimeMs) >= blinkIntervalMs)
+{
+  previousBlinkTimeMs = currentTimeMs;
+  setOutputState(!outputState);
+}
+```
+
+This method remains valid when the value returned by `millis()` overflows.
+
+### Manual Mode
+
+Manual mode allows the output to be controlled directly from the Serial Monitor.
+
+The following commands automatically select manual mode:
+
+```text
+on
+off
+toggle
+pulse 500
+```
+
+In manual mode, the output keeps its selected state until another command changes it.
+
+### Timed Pulse Mode
+
+The `pulse` command switches the output HIGH for a selected duration and then returns it LOW automatically.
+
+Example:
+
+```text
+pulse 500
+```
+
+This produces a 500 ms HIGH pulse.
+
+The pulse is non-blocking. The program continues reading serial commands while the pulse is active.
+
+## Serial Monitor Configuration
+
+Use the following Serial Monitor settings:
+
+```text
+Baud rate: 115200
+Line ending: Newline or Both NL & CR
+```
+
+## Serial Commands
+
+| Command | Function |
+|---|---|
+| `auto` | Start automatic blinking |
+| `manual` | Select manual mode without changing the current output |
+| `on` | Set the output HIGH |
+| `off` | Set the output LOW |
+| `toggle` | Invert the current output state |
+| `pulse 500` | Generate a 500 ms HIGH pulse |
+| `interval 1000` | Set the automatic blink interval to 1000 ms |
+| `status` | Print the current controller state |
+| `help` | Print the available command list |
+
+## Command Examples
+
+### Start Automatic Blinking
+
+```text
+auto
+```
+
+Expected status:
+
+```text
+Digital output controller status
+  Mode: AUTOMATIC
+  Output pin: 8
+  Output state: LOW / OFF
+  Blink interval: 500 ms
+  Pulse: INACTIVE
+```
+
+The LED then begins changing between ON and OFF automatically.
+
+### Switch the LED On
+
+```text
+on
+```
+
+Expected response:
+
+```text
+Output switched ON.
+```
+
+Expected status:
+
+```text
+Mode: MANUAL
+Output state: HIGH / ON
+```
+
+### Switch the LED Off
+
+```text
+off
+```
+
+Expected response:
+
+```text
+Output switched OFF.
+```
+
+### Toggle the Current State
+
+```text
+toggle
+```
+
+If the LED is OFF, it becomes ON. If it is ON, it becomes OFF.
+
+### Change the Blink Interval
+
+```text
+interval 1000
+```
+
+The output now changes state every 1000 ms.
+
+Allowed interval range:
+
+```text
+100 ms to 5000 ms
+```
+
+A value below 100 ms is limited to 100 ms. A value above 5000 ms is limited to 5000 ms.
+
+### Generate a Pulse
+
+```text
+pulse 750
+```
+
+The output becomes HIGH for 750 ms and then returns LOW.
+
+Allowed pulse range:
+
+```text
+50 ms to 10000 ms
+```
+
+### Print the Current Status
+
+```text
+status
+```
+
+Example:
+
+```text
+Digital output controller status
+  Mode: MANUAL
+  Output pin: 8
+  Output state: HIGH / ON
+  Blink interval: 500 ms
+  Pulse: INACTIVE
+```
+
+## Software Design
+
+The program is divided into small functions, with each function handling one responsibility.
+
+| Function | Responsibility |
+|---|---|
+| `setup()` | Configure the output pin and serial interface |
+| `loop()` | Read commands and update the controller |
+| `updateController()` | Select pulse or automatic processing |
+| `updateAutomaticMode()` | Toggle the output using non-blocking timing |
+| `updatePulse()` | End an active timed pulse |
+| `setOutputState()` | Store and apply the digital output state |
+| `readSerialInput()` | Collect serial characters into a fixed buffer |
+| `processCommand()` | Decode and execute commands |
+| `setBlinkInterval()` | Validate and store the blink interval |
+| `startPulse()` | Validate and start a timed pulse |
+| `printStatus()` | Display the controller state |
+| `printHelp()` | Display the command list |
+
+## Fixed-Size Command Buffer
+
+The program uses a fixed-size character array:
+
+```cpp
+char commandBuffer[COMMAND_BUFFER_SIZE];
+```
+
+This avoids repeated dynamic memory allocation from the Arduino `String` class.
+
+The input reader keeps one array location available for the terminating null character:
+
+```cpp
+if (commandLength < COMMAND_BUFFER_SIZE - 1)
+```
+
+If a command exceeds the available buffer, the entire remaining line is ignored until the next newline. This prevents part of an oversized command from being processed accidentally.
+
+## Input Validation
+
+Numeric values are converted with `strtol()`.
+
+The end pointer is checked to confirm that the complete argument is numeric:
+
+```cpp
+char* endPointer = nullptr;
+const long requestedValue = strtol(valueText, &endPointer, 10);
+
+if (*endPointer != '\0')
+{
+  // Reject invalid input.
+}
+```
+
+The `constrain()` function then limits accepted values to the configured operating range.
+
+## How to Run in Arduino IDE
+
+1. Create a folder named:
+
+```text
+Digital_Writing_Code
+```
+
+2. Place the following file inside it:
+
+```text
+Digital_Writing_Code.ino
+```
+
+3. Open the `.ino` file in Arduino IDE.
+4. Select:
+
+```text
+Tools → Board → Arduino AVR Boards → Arduino Uno
+```
+
+5. Select the connected serial port:
+
+```text
+Tools → Port → COMx
+```
+
+6. Click **Verify**.
+7. Click **Upload**.
+8. Open the Serial Monitor.
+9. Set the baud rate to `115200`.
+10. Enter `help` and press Enter.
+
+## How to Test in Tinkercad
+
+1. Create a new Tinkercad circuit.
+2. Add an Arduino Uno.
+3. Add one LED.
+4. Add a 220 Ω or 330 Ω resistor.
+5. Connect Arduino pin 8 to the resistor.
+6. Connect the resistor to the LED anode.
+7. Connect the LED cathode to Arduino GND.
+8. Open the code editor.
+9. Select **Text** mode.
+10. Replace the default code with `Digital_Writing_Code.ino`.
+11. Start the simulation.
+12. Open the Serial Monitor.
+13. Test the commands.
+
+## Recommended Test Procedure
+
+### Test 1: Startup
+
+Start the program and confirm:
+
+- The LED starts OFF.
+- The controller starts in automatic mode.
+- The status message shows output pin 8.
+- The default blink interval is 500 ms.
+
+### Test 2: Automatic Blinking
+
+Enter:
+
+```text
+auto
+```
+
+Confirm that:
+
+- The LED changes state repeatedly.
+- Each state lasts approximately 500 ms.
+- Serial commands remain responsive.
+
+### Test 3: Manual ON and OFF
+
+Enter:
+
+```text
+on
+```
+
+Confirm that the LED stays ON.
+
+Then enter:
+
+```text
+off
+```
+
+Confirm that the LED stays OFF.
+
+### Test 4: Toggle
+
+Enter `toggle` several times.
+
+Confirm that every command reverses the current LED state.
+
+### Test 5: Interval Setting
+
+Enter:
+
+```text
+interval 1000
+auto
+```
+
+Confirm that the LED changes state every one second.
+
+Then test:
+
+```text
+interval 50
+```
+
+The controller should limit the interval to 100 ms.
+
+Test:
+
+```text
+interval 7000
+```
+
+The controller should limit the interval to 5000 ms.
+
+### Test 6: Pulse Generation
+
+Enter:
+
+```text
+pulse 500
+```
+
+Confirm that:
+
+- The output becomes HIGH immediately.
+- The output returns LOW after approximately 500 ms.
+- The Serial Monitor prints `Pulse completed.`
+
+### Test 7: Invalid Input
+
+Test:
+
+```text
+pulse abc
+interval test
+unknown
+```
+
+Confirm that the program rejects each invalid command and continues running.
+
+### Test 8: Oversized Command
+
+Enter a command longer than the configured input buffer.
+
+Confirm that:
+
+- The command is discarded.
+- The program prints an error.
+- The next valid command is processed normally.
+
+## Expected Results
+
+The completed controller should demonstrate:
+
+- Stable digital output control
+- Responsive serial commands
+- Automatic and manual operation
+- Accurate non-blocking blink timing
+- Accurate non-blocking pulse timing
+- Valid input-range enforcement
+- Safe command-buffer handling
+
+## Simulation Evidence
+
+After completing the Tinkercad simulation, add:
+
+```text
+circuit/digital_output_wiring.png
+results/digital_output_simulation.png
+demo/digital_output_controller_demo.mp4
+```
+
+Suggested screenshot content:
+
+- Arduino Uno
+- LED and resistor
+- Pin 8 connection
+- Ground connection
+- Serial Monitor status
+- LED visibly switched ON
+
+Suggested video sequence:
+
+1. Show the circuit.
+2. Start automatic blinking.
+3. Enter `on`.
+4. Enter `off`.
+5. Enter `pulse 1000`.
+6. Enter `interval 250`.
+7. Return to automatic mode.
+
+## Safety Notes
+
+- Use a current-limiting resistor with the LED.
+- Do not connect motors, relays, or high-current loads directly to an Arduino output pin.
+- Use a transistor or driver circuit for loads requiring more current than an Arduino GPIO pin can safely supply.
+- Connect the grounds of separate power supplies when a shared control reference is required.
+- Disconnect power before changing physical wiring.
+
+## Possible Extensions
+
+- Add a push button for local mode control
+- Add software debouncing
+- Control multiple digital outputs
+- Add independent timing for multiple LEDs
+- Add binary output patterns
+- Add finite-state-machine sequencing
+- Add EEPROM storage for the selected interval
+- Add a relay-driver stage using a transistor and flyback diode
+- Add unit tests for command parsing
+- Add oscilloscope measurements of pulse duration
+
+## Technical Skills Demonstrated
+
+- Arduino C++
+- GPIO configuration
+- Digital logic control
+- Non-blocking scheduling
+- Time-based state changes
+- Serial communication
+- Command parsing
+- Numeric validation
+- Fixed-size buffers
+- Modular embedded-software design
+- Hardware interfacing
+- Simulation-based verification
+
+## License
+
+This project may be used for learning, testing, and portfolio demonstration.
