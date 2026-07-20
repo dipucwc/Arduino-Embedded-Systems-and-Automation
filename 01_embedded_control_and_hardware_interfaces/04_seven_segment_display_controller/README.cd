@@ -1,0 +1,697 @@
+# Non-Blocking Seven-Segment Display Controller
+
+## Overview
+
+This project controls a single-digit seven-segment display with an Arduino Uno. The display automatically counts from 0 to 9 without using `delay()`, and the operating state can be changed while the program is running.
+
+The controller supports automatic counting, manual digit selection, upward and downward counting, pause and resume, display blanking, reset, adjustable speed, Serial Monitor commands, and optional push-button control.
+
+The digit patterns are stored in a lookup table in program memory. A reusable display driver reads the selected pattern and updates segments `a` through `g`.
+
+## Project Status
+
+**Completed**
+
+## Main Features
+
+- Displays digits `0` through `9`
+- Automatic upward counting
+- Automatic downward counting
+- Manual digit selection
+- Non-blocking timing with `millis()`
+- Adjustable counting speed
+- Pause and resume control
+- Display blanking
+- Counter reset
+- Common-cathode and common-anode support
+- Lookup-table-based segment encoding
+- `PROGMEM` storage for constant digit patterns
+- Optional push-button control
+- Software button debouncing
+- Serial Monitor commands
+- Runtime status reporting
+- Modular Arduino C++ functions
+
+## Folder Structure
+
+```text
+05_seven_segment_display_controller/
+├── Seven_Segment_Display.ino
+├── README.md
+├── COMMANDS.txt
+├── circuit/
+│   └── seven_segment_display_wiring.png
+└── demo/
+    └── seven_segment_display_wiring_and_setup.mp4
+```
+
+## Hardware Requirements
+
+- Arduino Uno or compatible board
+- One single-digit seven-segment display
+- Seven 220 Ω or 330 Ω resistors
+- Optional normally-open push button
+- Breadboard
+- Jumper wires
+
+## Display Type
+
+The supplied configuration is for a **common-cathode** display:
+
+```cpp
+constexpr bool COMMON_ANODE = false;
+```
+
+For a common-anode display, change it to:
+
+```cpp
+constexpr bool COMMON_ANODE = true;
+```
+
+### Common-Cathode Display
+
+- Common pin or pins connect to GND.
+- A segment turns on when its Arduino output is HIGH.
+
+### Common-Anode Display
+
+- Common pin or pins connect to 5 V.
+- A segment turns on when its Arduino output is LOW.
+
+The wiring diagram supplied with this project shows the common-cathode configuration.
+
+## Segment Layout
+
+```text
+       a
+      ───
+   f │   │ b
+      ─g─
+   e │   │ c
+      ───
+       d
+```
+
+The decimal-point segment is not used.
+
+## Arduino Pin Mapping
+
+| Display segment | Arduino pin |
+|---|---:|
+| `a` | 2 |
+| `b` | 3 |
+| `c` | 4 |
+| `d` | 5 |
+| `e` | 6 |
+| `f` | 7 |
+| `g` | 8 |
+| Optional button | 9 |
+
+Each segment must have its own resistor.
+
+## Wiring
+
+### Segment Connections
+
+```text
+Arduino pin 2 → resistor → segment a
+Arduino pin 3 → resistor → segment b
+Arduino pin 4 → resistor → segment c
+Arduino pin 5 → resistor → segment d
+Arduino pin 6 → resistor → segment e
+Arduino pin 7 → resistor → segment f
+Arduino pin 8 → resistor → segment g
+```
+
+### Common Connection
+
+For the configured common-cathode display:
+
+```text
+Display COM pin or pins → Arduino GND
+```
+
+Some displays contain two common pins. Connect both common pins to GND.
+
+### Optional Button
+
+```text
+Arduino pin 9 → push button → Arduino GND
+```
+
+The program uses:
+
+```cpp
+pinMode(BUTTON_PIN, INPUT_PULLUP);
+```
+
+No external pull-up resistor is required.
+
+The button pauses or resumes automatic counting. If the display is in manual or blank mode, pressing the button returns it to automatic mode.
+
+## Important Pinout Note
+
+The physical pin numbers of seven-segment displays are not identical across all models.
+
+For Wokwi, connect using the labeled segment terminals:
+
+```text
+A, B, C, D, E, F, G, COM
+```
+
+For a physical display, check its datasheet before wiring. Do not assume that a particular physical leg always represents the same segment.
+
+## Digit Pattern Table
+
+The lookup table uses this bit order:
+
+```text
+a b c d e f g
+```
+
+A binary `1` means that the segment should be illuminated.
+
+| Digit | Pattern | Active segments |
+|---:|---|---|
+| 0 | `1111110` | a, b, c, d, e, f |
+| 1 | `0110000` | b, c |
+| 2 | `1101101` | a, b, d, e, g |
+| 3 | `1111001` | a, b, c, d, g |
+| 4 | `0110011` | b, c, f, g |
+| 5 | `1011011` | a, c, d, f, g |
+| 6 | `1011111` | a, c, d, e, f, g |
+| 7 | `1110000` | a, b, c |
+| 8 | `1111111` | a, b, c, d, e, f, g |
+| 9 | `1111011` | a, b, c, d, f, g |
+
+## Operating Modes
+
+### Automatic Mode
+
+The display counts continuously using the selected direction and interval.
+
+Default behavior:
+
+```text
+Start digit: 0
+Direction: UP
+Interval: 1000 ms
+```
+
+The automatic sequence is:
+
+```text
+0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 0
+```
+
+Downward counting produces:
+
+```text
+0 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1 → 0
+```
+
+### Manual Mode
+
+Entering a digit from `0` to `9` selects that digit and stops automatic counting.
+
+Example:
+
+```text
+5
+```
+
+The display shows `5` and the status reports:
+
+```text
+Mode: MANUAL
+Digit: 5
+```
+
+Enter `a` to return to automatic counting.
+
+### Blank Mode
+
+Enter:
+
+```text
+b
+```
+
+All seven segments switch off.
+
+The stored current digit remains available and is shown again when automatic mode is enabled.
+
+## Non-Blocking Timing
+
+The program uses `millis()` rather than `delay()`:
+
+```cpp
+if ((currentTimeMs - previousCountTimeMs) < countIntervalMs)
+{
+  return;
+}
+```
+
+This allows the Arduino to continue processing:
+
+- Serial Monitor commands
+- Push-button state changes
+- Display-mode changes
+- Speed and direction commands
+
+while the counter is running.
+
+## Serial Monitor Configuration
+
+```text
+Baud rate: 115200
+Line ending: Any setting
+```
+
+The program ignores spaces, carriage returns, and newline characters.
+
+## Commands
+
+| Command | Function |
+|---|---|
+| `0` to `9` | Select a digit and enter manual mode |
+| `a` | Start automatic counting |
+| `p` | Pause or resume automatic counting |
+| `u` | Set count direction to upward |
+| `d` | Set count direction to downward |
+| `+` | Increase counting speed |
+| `-` | Decrease counting speed |
+| `r` | Reset the stored digit to zero |
+| `b` | Blank the display |
+| `s` | Print current status |
+| `h` | Print the command list |
+| `?` | Print the command list |
+
+## Command Examples
+
+### Show a Manual Digit
+
+```text
+7
+```
+
+Expected result:
+
+```text
+Manual digit selected.
+Mode: MANUAL
+Digit: 7
+```
+
+### Start Automatic Counting
+
+```text
+a
+```
+
+### Pause and Resume
+
+```text
+p
+```
+
+Enter `p` again to resume.
+
+### Count Downward
+
+```text
+d
+a
+```
+
+### Count Upward
+
+```text
+u
+a
+```
+
+### Increase Counting Speed
+
+```text
++
++
++
+```
+
+Every `+` command reduces the interval by 100 ms until the minimum interval of 100 ms is reached.
+
+### Decrease Counting Speed
+
+```text
+-
+-
+-
+```
+
+Every `-` command increases the interval by 100 ms until the maximum interval of 5000 ms is reached.
+
+### Reset
+
+```text
+r
+```
+
+The stored digit becomes zero.
+
+### Blank the Display
+
+```text
+b
+```
+
+### Print Status
+
+```text
+s
+```
+
+Example:
+
+```text
+Seven-segment controller status
+  Mode: AUTOMATIC
+  Digit: 4
+  Direction: UP
+  Automatic counter: RUNNING
+  Count interval: 1000 ms
+  Display type: COMMON CATHODE
+```
+
+## Push-Button Operation
+
+The optional button uses software debouncing.
+
+### Automatic Mode
+
+Each valid button press toggles:
+
+```text
+RUNNING ↔ PAUSED
+```
+
+### Manual or Blank Mode
+
+A button press returns the controller to automatic mode.
+
+## Software Structure
+
+| Function | Responsibility |
+|---|---|
+| `configureHardware()` | Configure segment outputs and button input |
+| `displayDigit()` | Read a digit pattern and apply it to the display |
+| `writeSegment()` | Handle common-anode/common-cathode logic |
+| `blankDisplay()` | Switch off every segment |
+| `updateAutomaticCounter()` | Advance the digit with non-blocking timing |
+| `updateButton()` | Debounce the optional button |
+| `handleButtonPress()` | Pause, resume, or restore automatic mode |
+| `processSerialCommand()` | Execute Serial Monitor commands |
+| `resetCounter()` | Reset the stored digit |
+| `increaseCountingSpeed()` | Reduce the count interval |
+| `decreaseCountingSpeed()` | Increase the count interval |
+| `printStatus()` | Print the current state |
+| `printHelp()` | Print the command menu |
+
+## How to Run in Arduino IDE
+
+1. Create a folder named:
+
+```text
+Seven_Segment_Display
+```
+
+2. Place this file inside it:
+
+```text
+Seven_Segment_Display.ino
+```
+
+3. Open the file in Arduino IDE.
+4. Select Arduino Uno.
+5. Select the connected serial port.
+6. Click **Verify**.
+7. Click **Upload**.
+8. Open Serial Monitor at `115200` baud.
+9. Enter commands one at a time.
+
+## How to Run in Wokwi
+
+1. Create a new Arduino Uno project.
+2. Add a single-digit seven-segment display.
+3. Set the display type to common cathode.
+4. Add seven resistors.
+5. Set each resistor to 220 Ω or 330 Ω.
+6. Connect segments `A` through `G` to pins 2 through 8.
+7. Connect the display common pin or pins to GND.
+8. Optionally connect a button between pin 9 and GND.
+9. Paste `Seven_Segment_Display.ino` into `sketch.ino`.
+10. Start the simulation.
+11. Open Serial Monitor.
+12. Test the commands.
+
+## Recommended Test Procedure
+
+### Test 1: Startup
+
+Confirm that:
+
+- Digit `0` is shown.
+- Automatic mode is active.
+- Counting direction is upward.
+- Count interval is 1000 ms.
+
+### Test 2: Automatic Count
+
+Allow the simulation to run through all ten digits.
+
+Confirm:
+
+- Every digit is displayed correctly.
+- The sequence wraps from 9 to 0.
+- Serial commands remain responsive.
+
+### Test 3: Manual Digits
+
+Enter:
+
+```text
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+```
+
+Confirm that each digit is correct.
+
+### Test 4: Direction
+
+Enter:
+
+```text
+d
+a
+```
+
+Confirm downward counting.
+
+Then enter:
+
+```text
+u
+a
+```
+
+Confirm upward counting.
+
+### Test 5: Pause and Resume
+
+Enter:
+
+```text
+p
+```
+
+Confirm that the displayed digit remains unchanged.
+
+Enter `p` again and confirm that counting resumes.
+
+### Test 6: Speed
+
+Enter `+` several times and confirm that counting becomes faster.
+
+Enter `-` several times and confirm that counting becomes slower.
+
+### Test 7: Blank and Restore
+
+Enter:
+
+```text
+b
+```
+
+Confirm that all segments switch off.
+
+Enter:
+
+```text
+a
+```
+
+Confirm that the stored digit returns and counting resumes.
+
+### Test 8: Button
+
+Press the optional button.
+
+Confirm that automatic counting pauses or resumes.
+
+### Test 9: Invalid Input
+
+Enter an unsupported character such as:
+
+```text
+x
+```
+
+Confirm that the program reports an unknown command and continues running.
+
+## Suggested Demo Video Command Sequence
+
+Enter commands one at a time:
+
+```text
+s
+5
+9
+a
+d
++
++
+p
+p
+u
+r
+b
+a
+s
+h
+```
+
+Also press the optional button to demonstrate local pause and resume.
+
+## Expected Results
+
+The completed project should demonstrate:
+
+- Correct display of all decimal digits
+- Stable lookup-table segment control
+- Automatic upward and downward counting
+- Responsive manual commands
+- Non-blocking operation
+- Adjustable runtime speed
+- Correct pause and resume behavior
+- Display blanking and restoration
+- Push-button debouncing
+- Common-cathode/common-anode abstraction
+
+## Troubleshooting
+
+### All Segments Are Inverted
+
+Change:
+
+```cpp
+constexpr bool COMMON_ANODE = false;
+```
+
+to:
+
+```cpp
+constexpr bool COMMON_ANODE = true;
+```
+
+### Wrong Segments Illuminate
+
+Check that segment labels `a` through `g` match Arduino pins 2 through 8.
+
+### One Segment Is Always Off
+
+Check:
+
+- The segment resistor
+- The jumper wire
+- The display pin
+- The corresponding Arduino pin
+- The display orientation
+
+### Display Is Completely Off
+
+Check:
+
+- Common pin connection
+- Common-cathode/common-anode setting
+- Arduino power
+- Segment resistor values
+- Display orientation
+
+### Button Does Not Work
+
+Check:
+
+```text
+Pin 9 → button → GND
+```
+
+Use terminals from opposite sides of a four-leg tactile button.
+
+## Safety Notes
+
+- Use one resistor for every segment.
+- Do not use one shared resistor on the common terminal.
+- Do not connect a segment directly to an Arduino output without current limiting.
+- Confirm the display type before connecting the common pin.
+- Check the component datasheet before physical wiring.
+- Disconnect power before changing a physical circuit.
+
+## Possible Extensions
+
+- Four-digit multiplexed display
+- Decimal-point control
+- Hexadecimal characters
+- Stopwatch or timer mode
+- Button-controlled digit selection
+- External interrupt input
+- Shift-register control using 74HC595
+- Brightness control with PWM
+- Temperature or sensor-value display
+- EEPROM storage of runtime settings
+
+## Technical Skills Demonstrated
+
+- Arduino C++
+- Digital GPIO control
+- Seven-segment display interfacing
+- Lookup tables
+- Binary bit manipulation
+- `PROGMEM`
+- Non-blocking scheduling
+- Enumerations and state management
+- Push-button debouncing
+- Serial command processing
+- Common-anode/common-cathode abstraction
+- Embedded-system testing
+
+## License
+
+This project may be used for learning, testing, and portfolio demonstration.
