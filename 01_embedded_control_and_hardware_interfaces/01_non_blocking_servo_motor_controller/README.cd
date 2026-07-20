@@ -1,0 +1,76 @@
+## Non-Blocking Servo Motor Controller
+
+## Overview
+
+This project controls a servo motor using an Arduino Uno.  
+The controller supports automatic and manual operating modes.
+
+The servo position is updated using non-blocking timing with `millis()`,
+so the Arduino can perform other tasks while the servo is moving.
+
+## Hardware
+
+- Arduino Uno
+- Servo motor
+- Jumper wires
+
+## Circuit Connection
+
+| Servo connection | Arduino Uno |
+|---|---|
+| Signal | Digital pin 3 |
+| VCC | 5V |
+| GND | GND |
+
+## Operating Modes
+
+### Automatic mode
+
+The servo automatically moves between predefined positions.
+
+### Manual mode
+
+The servo position can be controlled using commands entered through the
+Arduino Serial Monitor.
+
+## Serial Commands
+
+| Command | Function |
+|---|---|
+| `a` | Select automatic mode |
+| `m` | Select manual mode |
+
+Add any additional angle-control commands used by the actual program.
+
+## Technical Features
+
+- Arduino Servo library
+- Non-blocking timing using `millis()`
+- Automatic and manual operating modes
+- Servo angle validation
+- Controller status through the Serial Monitor
+- State-based control structure
+
+## How to Run
+
+1. Connect the servo signal wire to Arduino digital pin 3.
+2. Connect the servo red wire to 5V.
+3. Connect the servo ground wire to GND.
+4. Open `Controlling_Servo_Motor.ino` in Arduino IDE.
+5. Select Arduino Uno from the board menu.
+6. Compile and upload the program.
+7. Open the Serial Monitor.
+8. Use the available commands to change the operating mode.
+
+## Simulation Result
+
+The servo motor successfully receives commands from the Arduino Uno and
+moves its horn to the requested angle.
+
+## Circuit
+
+![Servo motor circuit](circuit/servo_motor_wiring.png)
+
+## Demonstration
+
+The demonstration video is available in the `demo` folder.
