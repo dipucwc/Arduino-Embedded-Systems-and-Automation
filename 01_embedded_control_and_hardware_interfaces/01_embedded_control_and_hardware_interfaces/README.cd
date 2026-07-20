@@ -1,0 +1,56 @@
+# Embedded Control and Hardware Interfaces
+
+This folder contains Arduino-based embedded-system projects focused on hardware control, timing, interrupt handling, pulse-width modulation, actuator control, and display interfacing.
+
+The projects are organized as independent modules so that each implementation can be compiled, tested, and documented separately. The code is written in Arduino C++ with an emphasis on readable structure, modular functions, input validation, and non-blocking execution where appropriate.
+
+## Project Status
+
+**Ongoing**
+
+The current implementations are being reorganized, tested, documented, and extended with circuit diagrams and simulation results.
+
+## Technical Areas
+
+The projects in this folder cover:
+
+- Digital output control
+- Servo motor positioning
+- Non-blocking timing using `millis()`
+- Pulse-width modulation
+- Interrupt-driven event handling
+- Seven-segment display interfacing
+- Serial Monitor commands
+- Embedded state management
+- Hardware input and output
+- Modular Arduino C++ programming
+
+## Folder Structure
+
+```text
+01_embedded_control_and_hardware_interfaces/
+│
+├── 01_non_blocking_servo_motor_controller/
+│   ├── Controlling_Servo_Motor.ino
+│   ├── README.md
+│   ├── circuit/
+│   ├── results/
+│   └── demo/
+│
+├── 02_digital_output_control/
+│   ├── Digital_Writing_Code.ino
+│   └── README.md
+│
+├── 03_interrupt_driven_event_handling/
+│   ├── Interrupt_Service_Routine.ino
+│   └── README.md
+│
+├── 04_pwm_led_brightness_controller/
+│   ├── Led_Brightness_By_PWM.ino
+│   └── README.md
+│
+├── 05_seven_segment_display_interface/
+│   ├── Seven_Segment_Display.ino
+│   └── README.md
+│
+└── README.md
